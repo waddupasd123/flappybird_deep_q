@@ -16,6 +16,7 @@ GAMMA = 0.99
 LEARNING_RATE = 0.000006
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
 
 def train():
     model = FlappyConv()
@@ -29,19 +30,22 @@ def train():
     
     image, gameInfo, death = Flappy.mainGame(gameInfo)
     image = cv2.cvtColor(cv2.resize(image, (80, 80)), cv2.COLOR_BGR2GRAY)
-    image = np.reshape(image, (80, 80, 1))
+    _, image = cv2.threshold(image,1,255,cv2.THRESH_BINARY)
+    image = image[None, :, :].astype(np.float32)
+    
 
-    #state = np.stack((image, image, image, image), axis=2)
+
 
     image = torch.from_numpy(image)
     model.to(device)
     image = image.to(device)
-
-    state = torch.cat(tuple(image for _ in range(4)))[None, :, :, :]
+    state = torch.cat(tuple(image for _ in range(4)))[None, :, :]
 
     replay_memory = []
     iter = 0
     score = 0
+    losses = []
+    iterations = []
     while iter < NUM_ITERS:
         prediction = model(state)[0]
         # Exploration or exploitation
@@ -52,12 +56,15 @@ def train():
             print("Perform a random action")
             action = randint(0, 1)
         else:
-            action = torch.argmax(prediction)[0]
+            action = torch.argmax(prediction)
 
-        quit = Flappy.action(action)
+        quit = Flappy.action(gameInfo, action)
         next_image, gameInfo, death = Flappy.mainGame(gameInfo)
         if death:
             reward = -1
+            Flappy.launch()
+            movementInfo = Flappy.initialSetup()
+            gameInfo = Flappy.mainGameSetup(movementInfo)
         elif gameInfo['score'] > score:
             reward = 1
             score = gameInfo['score']
@@ -65,7 +72,8 @@ def train():
             reward = 0.1
 
         next_image = cv2.cvtColor(cv2.resize(next_image, (80, 80)), cv2.COLOR_BGR2GRAY)
-        next_image = np.reshape(next_image, (80, 80, 1))
+        _, next_image = cv2.threshold(next_image,1,255,cv2.THRESH_BINARY)
+        next_image = next_image[None, :, :].astype(np.float32)
         next_image = torch.from_numpy(next_image)
         next_image = next_image.to(device)
         next_state = torch.cat((state[0, 1:, :, :], next_image))[None, :, :, :]
@@ -99,7 +107,12 @@ def train():
         # y_batch = y_batch.detach()
         loss = criterion(q_value, y_batch)
         loss.backward()
+        print(loss)
+        losses.append(loss.item())
+        iterations.append(iter)
+
         optimizer.step()
+
 
         state = next_state
         iter += 1
@@ -114,7 +127,7 @@ def train():
         plt.title("Train/Loss")
         plt.ylabel("Train")
         plt.ylabel("Loss")
-        plt.plot(loss, iter)
+        plt.plot(iterations, losses)
         plt.show(block=False)
         plt.pause(0.001)
         #writer.add_scalar('Train/Epsilon', epsilon, iter)

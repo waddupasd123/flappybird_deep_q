@@ -251,7 +251,8 @@ def mainGame(gameInfo):
     crashTest = checkCrash({'x': gameInfo['playerx'], 'y': gameInfo['playery'], 'index': gameInfo['playerIndex']},
                             gameInfo['upperPipes'], gameInfo['lowerPipes'])
     if crashTest[0]:
-        return gameInfo, True
+        image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+        return image_data, gameInfo, True
 
     # check for score
     playerMidPos = gameInfo['playerx'] + IMAGES['player'][0].get_width() / 2
