@@ -5,7 +5,7 @@ import cv2
 import os
 import flappy_mod as Flappy
 from conv_model import FlappyConv
-from random import random, randint, sample
+import random
 import matplotlib.pyplot as plt
 
 # Adjustable values
@@ -36,21 +36,19 @@ def train():
     movementInfo = Flappy.initialSetup()
     gameInfo = Flappy.mainGameSetup(movementInfo)
     
-    # Convert screenshot of game to numpy array
+    # Convert screenshot of game to grayscale number array
     image, gameInfo, death = Flappy.mainGame(gameInfo)
     image = cv2.cvtColor(cv2.resize(image, (80, 80)), cv2.COLOR_BGR2GRAY)
     _, image = cv2.threshold(image,1,255,cv2.THRESH_BINARY)
     image = image[None, :, :].astype(np.float32)
     
-    # Input image into deep q network
+    # Convert array to 4 input tensor
     image = torch.from_numpy(image)
     model.to(device)
     image = image.to(device)
     state = torch.cat(tuple(image for _ in range(4)))[None, :, :]
 
     replay_memory = []
-    losses = []
-    iterations = []
     iter = 0
     score = 0
     episode_len = 0
@@ -60,11 +58,11 @@ def train():
 
         # Exploration or exploitation
         epsilon = FINAL_EPSILON + ((NUM_ITERS - iter) * (INITIAL_EPSILON - FINAL_EPSILON) / NUM_ITERS)
-        u = random()
+        u = random.random()
         random_action = u <= epsilon
         if random_action:
             print("Perform a random action")
-            action = randint(0, 1)
+            action = random.randint(0, 1)
         else:
             action = torch.argmax(prediction)
 
@@ -73,7 +71,7 @@ def train():
         if (quit):
             break
 
-        # Next Fram
+        # Next Frame
         image, gameInfo, death = Flappy.mainGame(gameInfo)
 
         # Rewards
@@ -89,53 +87,66 @@ def train():
         else: 
             reward = 0.1
 
-        # Next state
+        # Convert next frame to grayscale number array
         image = cv2.cvtColor(cv2.resize(image, (80, 80)), cv2.COLOR_BGR2GRAY)
         _, image = cv2.threshold(image,1,255,cv2.THRESH_BINARY)
         image = image[None, :, :].astype(np.float32)
+
+        # Replace 4th input with the new frame
         image = torch.from_numpy(image)
         image = image.to(device)
         next_state = torch.cat((state[0, 1:, :, :], image))[None, :, :, :]
 
-        # Save important values
+        # Save state batch (similar to q-learning I think)
         replay_memory.append([state, action, reward, next_state, death])
         if len(replay_memory) > REPLAY_MEMORY_SIZE:
             del replay_memory[0]
-        batch = sample(replay_memory, min(len(replay_memory), BATCH_SIZE))
-        state_batch, action_batch, reward_batch, next_state_batch, terminal_batch = zip(*batch)
 
+        ####
+        # If I am correct, this whole section below explores and re-trains 
+        # other possible/previous states to speed up process of recognising patterns.
+        # Otherwise, it is used to do some gradient stuff.
+        # I dunno, someone plz help
 
+        # Get random state batch
+        batch = random.sample(replay_memory, min(len(replay_memory), BATCH_SIZE))
+        state_batch, action_batch, reward_batch, next_state_batch, death_batch = zip(*batch)
+
+        # Convert to tensor ready data
         state_batch = torch.cat(tuple(state for state in state_batch))
-        action_batch = torch.from_numpy(
-            np.array([[1, 0] if action == 0 else [0, 1] for action in action_batch], dtype=np.float32))
+        action_batch = torch.from_numpy(np.array([[1, 0] if action == 0 else [0, 1] for action in action_batch], dtype=np.float32))
         reward_batch = torch.from_numpy(np.array(reward_batch, dtype=np.float32)[:, None])
         next_state_batch = torch.cat(tuple(state for state in next_state_batch))
 
+        # Use gpu if available
         state_batch = state_batch.to(device)
         action_batch = action_batch.to(device)
         reward_batch = reward_batch.to(device)
         next_state_batch = next_state_batch.to(device)
 
-
+        # Input into deep-q-network
         current_prediction_batch = model(state_batch)
         next_prediction_batch = model(next_state_batch)
 
+        # I dunno what this is
         y_batch = torch.cat(
-            tuple(reward if terminal else reward + GAMMA * torch.max(prediction) for reward, terminal, prediction in
-                  zip(reward_batch, terminal_batch, next_prediction_batch)))
+            tuple(reward if death else reward + GAMMA * torch.max(prediction) for reward, death, prediction in
+                  zip(reward_batch, death_batch, next_prediction_batch)))
 
+        # Same gradient step stuff? Not sure
         q_value = torch.sum(current_prediction_batch * action_batch, dim=1)
         optimizer.zero_grad()
-        # y_batch = y_batch.detach()
+        y_batch = y_batch.detach()
         loss = loss_func(q_value, y_batch)
         loss.backward()
         optimizer.step()
 
-        losses.append(loss.item())
-        iterations.append(iter)
+        ####
 
+        # Train next state
         state = next_state
 
+        # Print values
         print("Iteration: {}/{}, Action: {}, Loss: {}, Epsilon {}, Reward: {}, Q-value: {}".format(
             iter + 1,
             NUM_ITERS,
@@ -143,18 +154,21 @@ def train():
             loss,
             epsilon, reward, torch.max(prediction)))
 
-        if iter % 25000 == 0:
+        # Save values every 10000 iterations
+        if iter % 10000 == 0:
             torch.save(model, "model_weights/flappy_" + str(iter) + ".pth")
 
         iter += 1
 
+        # Plot episode
         episode_len += 1
         if (death):
             print("Start Episode", len(model.episodes) + 1)
             model.episodes.append(episode_len)
             plot_durations(model.episodes)
             episode_len = 0
-        
+    
+    # Save model and figure
     plt.savefig('training_results.png')
     torch.save(model, "model_weights/flappy.pth")
 
