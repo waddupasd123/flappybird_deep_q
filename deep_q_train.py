@@ -16,6 +16,7 @@ REPLAY_MEMORY_SIZE = 50000
 BATCH_SIZE = 32
 GAMMA = 0.99
 LEARNING_RATE = 0.000006
+NUM_ITERS = 2000000
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
@@ -52,7 +53,7 @@ def train():
     episodes, iter = load_training_states()
     score = 0
     episode_len = 0
-    NUM_ITERS = 2000000 + iter
+    #NUM_ITERS = 2000000 + iter
     while iter < NUM_ITERS:
         # 2 Output values
         prediction = model(state)[0]
@@ -165,9 +166,12 @@ def train():
             loss,
             epsilon, reward, torch.max(prediction)))
 
-        # Save values every 10000 iterations
+        # Save values and model
         if iter % 10000 == 0:
-            torch.save(model, "model_weights/flappy_" + str(iter) + ".pth")
+            torch.save(model.state_dict(), "model_weights/flappy_" + str(iter) + ".pth")
+        if iter % 25000 == 0:
+            torch.save(model.state_dict(), "model_weights/flappy.pth")
+        
 
         iter += 1
 
