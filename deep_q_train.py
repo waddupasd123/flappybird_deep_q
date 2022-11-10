@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import cv2
 import os
+import json
 import flappy_mod as Flappy
 from conv_model import FlappyConv
 import random
@@ -11,7 +12,6 @@ import matplotlib.pyplot as plt
 # Adjustable values
 INITIAL_EPSILON = 0.1       # starting value of epsilon
 FINAL_EPSILON = 0.0001      # final value of epsilon
-NUM_ITERS = 2000000
 REPLAY_MEMORY_SIZE = 50000
 BATCH_SIZE = 32
 GAMMA = 0.99
@@ -38,7 +38,7 @@ def train():
     
     # Convert screenshot of game to grayscale number array
     image, gameInfo, death = Flappy.mainGame(gameInfo)
-    image = cv2.cvtColor(cv2.resize(image, (80, 80)), cv2.COLOR_BGR2GRAY)
+    image = cv2.cvtColor(cv2.resize(image, (84, 84)), cv2.COLOR_BGR2GRAY)
     _, image = cv2.threshold(image,1,255,cv2.THRESH_BINARY)
     image = image[None, :, :].astype(np.float32)
     
@@ -49,9 +49,10 @@ def train():
     state = torch.cat(tuple(image for _ in range(4)))[None, :, :]
 
     replay_memory = []
-    iter = 0
+    episodes, iter = load_training_states()
     score = 0
     episode_len = 0
+    NUM_ITERS = 2000000 + iter
     while iter < NUM_ITERS:
         # 2 Output values
         prediction = model(state)[0]
@@ -88,7 +89,7 @@ def train():
             reward = 0.1
 
         # Convert next frame to grayscale number array
-        image = cv2.cvtColor(cv2.resize(image, (80, 80)), cv2.COLOR_BGR2GRAY)
+        image = cv2.cvtColor(cv2.resize(image, (84, 84)), cv2.COLOR_BGR2GRAY)
         _, image = cv2.threshold(image,1,255,cv2.THRESH_BINARY)
         image = image[None, :, :].astype(np.float32)
 
@@ -107,6 +108,15 @@ def train():
         # other possible/previous states to speed up process of recognising patterns.
         # Otherwise, it is used to do some gradient stuff.
         # I dunno, someone plz help
+
+        # Deep Q-Learning (DQN) essentially has been Q-Learning 
+        # with a combination of neural networks applied to deal 
+        # with a lot of states that is too much for working 
+        # with Q-tables. Experience replay is a core technique 
+        # in DQN: it stores experiences (e.g. state, action, 
+        # state transition, reward, etc.) to calculate the q-values 
+        # rather than calculating the values as the simulation progresses.
+        # Source: https://github.com/hardlyrichie/pytorch-flappy-bird
 
         # Get random state batch
         batch = random.sample(replay_memory, min(len(replay_memory), BATCH_SIZE))
@@ -134,6 +144,7 @@ def train():
                   zip(reward_batch, death_batch, next_prediction_batch)))
 
         # Same gradient step stuff? Not sure
+        # explained here: https://www.toptal.com/deep-learning/pytorch-reinforcement-learning-tutorial
         q_value = torch.sum(current_prediction_batch * action_batch, dim=1)
         optimizer.zero_grad()
         y_batch = y_batch.detach()
@@ -163,14 +174,15 @@ def train():
         # Plot episode
         episode_len += 1
         if (death):
-            print("Start Episode", len(model.episodes) + 1)
-            model.episodes.append(episode_len)
-            plot_durations(model.episodes)
+            print("Start Episode", len(episodes) + 1)
+            episodes.append(episode_len)
+            plot_durations(episodes)
             episode_len = 0
     
     # Save model and figure
     plt.savefig('training_results.png')
-    torch.save(model, "model_weights/flappy.pth")
+    torch.save(model.state_dict(), "model_weights/flappy.pth")
+    save_training_states(episodes, iter)
 
 
 def plot_durations(episodes):
@@ -189,6 +201,27 @@ def plot_durations(episodes):
         plt.plot(means.numpy())
 
     plt.pause(0.001)
+
+
+def load_training_states():
+    """Load current training state from json file."""
+    print("Loading training states from json file...")
+    try:
+        with open("data/training_values_resume.json", "r") as f:
+            training_state = json.load(f)
+            episodes = training_state['episodes']
+            iter = training_state['iter']
+            return episodes, iter
+    except IOError:
+        pass  
+    return [], 0
+
+def save_training_states(episodes, iter):
+    """Save current training state to json file."""
+    print(f"Saving training states with {len(episodes)} episodes to file...")
+    with open("data/training_values_resume.json", "w") as f:
+        json.dump({'episodes': episodes,
+                    'iter': iter}, f)
 
 
 
