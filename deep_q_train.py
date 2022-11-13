@@ -169,8 +169,9 @@ def train():
         # Save values and model
         if iter % 10000 == 0:
             torch.save(model.state_dict(), "model_weights/flappy_" + str(iter) + ".pth")
-        if iter % 25000 == 0:
+        if iter % 20000 == 0:
             torch.save(model.state_dict(), "model_weights/flappy.pth")
+            save_training_states(episodes, iter)
         
 
         iter += 1
