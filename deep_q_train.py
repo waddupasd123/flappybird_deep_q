@@ -91,7 +91,9 @@ def train():
 
         # Convert next frame to grayscale number array
         image = cv2.cvtColor(cv2.resize(image, (84, 84)), cv2.COLOR_BGR2GRAY)
-        _, image = cv2.threshold(image,1,255,cv2.THRESH_BINARY)
+        _, image = cv2.threshold(image,100,255,cv2.THRESH_BINARY)
+        cv2.imshow('result.jpg', image)
+        
         image = image[None, :, :].astype(np.float32)
 
         # Replace 4th input with the new frame
@@ -181,11 +183,11 @@ def train():
         if (death):
             print("Start Episode", len(episodes) + 1)
             episodes.append(episode_len)
-            plot_durations(episodes)
+            #plot_durations(episodes)
             episode_len = 0
     
     # Save model and figure
-    plt.savefig('training_results.png')
+    #plt.savefig('training_results.png')
     torch.save(model.state_dict(), "model_weights/flappy.pth")
     save_training_states(episodes, iter)
 
