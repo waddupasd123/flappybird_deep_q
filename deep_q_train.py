@@ -40,7 +40,7 @@ def train():
     # Convert screenshot of game to grayscale number array
     image, gameInfo, death = Flappy.mainGame(gameInfo)
     image = cv2.cvtColor(cv2.resize(image, (84, 84)), cv2.COLOR_BGR2GRAY)
-    _, image = cv2.threshold(image,1,255,cv2.THRESH_BINARY)
+    _, image = cv2.threshold(image,127,255,cv2.THRESH_BINARY_INV)
     image = image[None, :, :].astype(np.float32)
     
     # Convert array to 4 input tensor
@@ -51,6 +51,8 @@ def train():
 
     replay_memory = []
     episodes, iter = load_training_states()
+    plot_durations(episodes)
+    plt.savefig('training_results.png')
     score = 0
     episode_len = 0
     #NUM_ITERS = 2000000 + iter
@@ -90,9 +92,13 @@ def train():
             reward = 0.1
 
         # Convert next frame to grayscale number array
+        #screenshot = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        #cv2.imwrite('image' + str(iter) + '.jpg', screenshot)
         image = cv2.cvtColor(cv2.resize(image, (84, 84)), cv2.COLOR_BGR2GRAY)
-        _, image = cv2.threshold(image,100,255,cv2.THRESH_BINARY)
+        #cv2.imwrite('resize' + str(iter) + '.jpg', image)
+        _, image = cv2.threshold(image,127,255,cv2.THRESH_BINARY_INV)
         cv2.imshow('result.jpg', image)
+        #cv2.imwrite('threshold' + str(iter) + '.jpg', image)
         
         image = image[None, :, :].astype(np.float32)
 
