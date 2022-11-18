@@ -20,14 +20,12 @@ NUM_ITERS = 2000000
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
-print(torch.version.cuda)
-print(torch.cuda.get_device_name(0))
 
 def train():
     # Model setup
     model = FlappyConv()
     if os.path.exists("model_weights/flappy.pth"):
-        model.load_state_dict(torch.load("model_weights/flappy.pth"))
+        model.load_state_dict(torch.load("model_weights/flappy.pth", map_location=device))
         model.eval()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     loss_func = nn.MSELoss()
@@ -51,11 +49,10 @@ def train():
 
     replay_memory = []
     episodes, iter = load_training_states()
-    plot_durations(episodes)
-    plt.savefig('training_results.png')
+    #plot_durations(episodes)
+    #plt.savefig('training_results.png')
     score = 0
     episode_len = 0
-    #NUM_ITERS = 2000000 + iter
     while iter < NUM_ITERS:
         # 2 Output values
         prediction = model(state)[0]
@@ -107,25 +104,13 @@ def train():
         image = image.to(device)
         next_state = torch.cat((state[0, 1:, :, :], image))[None, :, :, :]
 
-        # Save state batch (similar to q-learning I think)
+        #########
+        # Episode replay
+
+        # Save state batch 
         replay_memory.append([state, action, reward, next_state, death])
         if len(replay_memory) > REPLAY_MEMORY_SIZE:
             del replay_memory[0]
-
-        ####
-        # If I am correct, this whole section below explores and re-trains 
-        # other possible/previous states to speed up process of recognising patterns.
-        # Otherwise, it is used to do some gradient stuff.
-        # I dunno, someone plz help
-
-        # Deep Q-Learning (DQN) essentially has been Q-Learning 
-        # with a combination of neural networks applied to deal 
-        # with a lot of states that is too much for working 
-        # with Q-tables. Experience replay is a core technique 
-        # in DQN: it stores experiences (e.g. state, action, 
-        # state transition, reward, etc.) to calculate the q-values 
-        # rather than calculating the values as the simulation progresses.
-        # Source: https://github.com/hardlyrichie/pytorch-flappy-bird
 
         # Get random state batch
         batch = random.sample(replay_memory, min(len(replay_memory), BATCH_SIZE))
@@ -147,13 +132,12 @@ def train():
         current_prediction_batch = model(state_batch)
         next_prediction_batch = model(next_state_batch)
 
-        # I dunno what this is
+        # Some gradient descent step?
+        # explained here: https://www.toptal.com/deep-learning/pytorch-reinforcement-learning-tutorial
         y_batch = torch.cat(
             tuple(reward if death else reward + GAMMA * torch.max(prediction) for reward, death, prediction in
                   zip(reward_batch, death_batch, next_prediction_batch)))
 
-        # Same gradient step stuff? Not sure
-        # explained here: https://www.toptal.com/deep-learning/pytorch-reinforcement-learning-tutorial
         q_value = torch.sum(current_prediction_batch * action_batch, dim=1)
         optimizer.zero_grad()
         y_batch = y_batch.detach()
