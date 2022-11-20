@@ -27,10 +27,12 @@ Setup
    ```bash
    $ python deep_q_train.py
    ```
-   Note: This model has already been coded to train to ``NUM_ITERS = 2,000,000`` iterations. 
+   Note: This model has already been coded to train to ``NUM_ITERS = 2000000`` iterations. 
    As it is already trained 2,000,000 times, it will close as soon as it loads.  
-      1. To continue training, increase ``NUM_ITERS`` in ``deep_q_train.py``, ``line 19``.
-      2. To start training from the beginning, delete ``data/training_values_resume.json`` and files in ``model_weights``, in particular ``flappy.pth``.
+      1. To continue training, increase ``NUM_ITERS`` in ``deep_q_train.py``, ``line 19`` 
+      (For example: ``NUM_ITERS = 3000000``).
+      2. To start training from the beginning, delete ``data/training_values_resume.json`` and files in ``model_weights``, in particular ``flappy.pth``. \
+      Only the latest saved model is available to save storage space.
       (Make sure to back up because it takes a long time to train.)
 
 Description

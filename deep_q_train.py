@@ -106,7 +106,6 @@ def train():
 
         #########
         # Episode replay
-
         # Save state batch 
         replay_memory.append([state, action, reward, next_state, death])
         if len(replay_memory) > REPLAY_MEMORY_SIZE:
@@ -132,8 +131,7 @@ def train():
         current_prediction_batch = model(state_batch)
         next_prediction_batch = model(next_state_batch)
 
-        # Some gradient descent step?
-        # explained here: https://www.toptal.com/deep-learning/pytorch-reinforcement-learning-tutorial
+        # Apply gradient descent step in backward propagation
         y_batch = torch.cat(
             tuple(reward if death else reward + GAMMA * torch.max(prediction) for reward, death, prediction in
                   zip(reward_batch, death_batch, next_prediction_batch)))
@@ -177,7 +175,8 @@ def train():
             episode_len = 0
     
     # Save model and figure
-    #plt.savefig('training_results.png')
+    plot_durations(episodes)
+    plt.savefig('training_results.png')
     torch.save(model.state_dict(), "model_weights/flappy.pth")
     save_training_states(episodes, iter)
 
