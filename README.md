@@ -8,7 +8,7 @@ Flappy Bird made in python from [here](https://github.com/sourabhv/FlapPyBird)
 Setup 
 ---------------------------
 
-1. Install Python 3.x (recommended) from [here](https://www.python.org/download/releases/) (Or use your preffered package manager)
+1. Install Python 3.x (recommended) from [here](https://www.python.org/download/releases/) (Or use your preferred package manager)
 
 2. _Optional_: Setup a virtual environment from [here](https://pypi.org/project/virtualenv/)
 
